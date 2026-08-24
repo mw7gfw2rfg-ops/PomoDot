@@ -1,4 +1,5 @@
 import Foundation
+import GlassKit
 import Observation
 
 /// One completed stretch of focus. Immutable — a fact about a moment.
@@ -27,10 +28,10 @@ public struct FocusEntry: Codable, Sendable, Equatable {
         self.day = day
     }
 
-    /// `yyyy-MM-dd` in the given calendar's timezone.
+    /// `yyyy-MM-dd` in the given calendar's timezone. Delegates to GlassKit so the log and
+    /// the heatmap can never disagree about what a day is.
     public static func dayString(for date: Date, calendar: Calendar) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+        DayKey.string(for: date, calendar: calendar)
     }
 
     /// The stored day if present, otherwise derived from `start`.

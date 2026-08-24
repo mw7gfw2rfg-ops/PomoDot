@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import PomoDotKit
+import GlassKit
 
 /// A controllable clock, so tests assert on time arithmetic rather than on sleeping.
 @MainActor
@@ -225,60 +226,4 @@ func progressRunsZeroToOne() {
     #expect(abs(engine.progress - 0.5) < 0.01)
     clock.advance(Double(25 * 60))
     #expect(engine.progress == 1)
-}
-
-// MARK: - Dot matrix
-
-@Test
-func everyDigitAndTheColonHaveGlyphs() {
-    // ISA ISC-22, ISC-23.
-    for character in "0123456789:" {
-        #expect(DotMatrix.glyph(for: character) != nil, "missing glyph for \(character)")
-    }
-}
-
-@Test
-func everyDigitGlyphIsFiveWideAndSevenTall() {
-    for (value, glyph) in DotMatrix.digits.enumerated() {
-        #expect(glyph.width == 5, "digit \(value) is \(glyph.width) wide")
-        #expect(glyph.rows.count == DotMatrix.height, "digit \(value) is \(glyph.rows.count) tall")
-    }
-}
-
-@Test
-func everyDigitGlyphIsDistinct() {
-    // A copy-paste slip in the glyph table would show up as two digits rendering alike,
-    // which is exactly the kind of bug that survives a code read.
-    let patterns = DotMatrix.digits.map { $0.rows }
-    for i in patterns.indices {
-        for j in patterns.indices where j > i {
-            #expect(patterns[i] != patterns[j], "digits \(i) and \(j) render identically")
-        }
-    }
-}
-
-@Test
-func clockStringIsAlwaysZeroPaddedAndNeverNegative() {
-    #expect(DotMatrix.clockString(25 * 60) == "25:00")
-    #expect(DotMatrix.clockString(61) == "01:01")
-    #expect(DotMatrix.clockString(0) == "00:00")
-    #expect(DotMatrix.clockString(-30) == "00:00", "no minus sign exists in the glyph table")
-}
-
-@Test
-func layoutProducesSevenRowsAndKeepsTheColonNarrow() {
-    let (cells, width) = DotMatrix.layout("25:00")
-    #expect(cells.count == DotMatrix.height)
-    // 4 digits at 5 wide + a 1-wide colon + 4 single-column gaps.
-    #expect(width == 4 * 5 + 1 + 4)
-    for row in cells { #expect(row.count == width) }
-}
-
-@Test
-func layoutLightsSomeDotsAndLeavesOthersUnlit() {
-    // The unlit dots are load-bearing — they're the scrim that lets the panel be clear.
-    let (cells, _) = DotMatrix.layout("25:00")
-    let flat = cells.flatMap { $0 }
-    #expect(flat.contains(true))
-    #expect(flat.contains(false))
 }

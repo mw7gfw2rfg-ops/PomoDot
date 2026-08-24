@@ -1,4 +1,5 @@
 import SwiftUI
+import GlassKit
 
 /// The Liquid Glass panel.
 ///
@@ -61,7 +62,7 @@ public struct PanelView: View {
         .padding(.horizontal, 20)
         .padding(.top, 16)
         .padding(.bottom, 14)
-        .frame(width: Theme.panelWidth)
+        .frame(width: Layout.panelWidth)
         .glassEffect(glass, in: .rect(cornerRadius: Theme.panelCornerRadius))
         .animation(reduceMotion ? nil : Theme.springDefault, value: engine.phase)
         .animation(reduceMotion ? nil : Theme.springDefault, value: engine.state)
@@ -118,7 +119,7 @@ public struct PanelView: View {
                           unlitOpacity: reduceTransparency ? 0.10 : Theme.dotOff)
                 .animation(nil, value: engine.displayRemaining)  // digits swap, they don't slide
         }
-        .frame(width: Theme.dialSize, height: Theme.dialSize)
+        .frame(width: Layout.dialSize, height: Layout.dialSize)
         .frame(maxWidth: .infinity)
     }
 
@@ -160,7 +161,7 @@ public struct PanelView: View {
             Legend("MIN", size: 8, opacity: 0.34)
 
             ForEach(presets, id: \.self) { minutes in
-                PresetChip(minutes: minutes,
+                PresetChip("\(minutes)",
                            isSelected: engine.durations.focus == minutes * 60,
                            accent: accent) {
                     engine.durations.focus = minutes * 60

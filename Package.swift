@@ -3,17 +3,20 @@
 import PackageDescription
 
 // PomoDot — a transparent Liquid Glass Pomodoro timer for the macOS menu bar.
-// Zero dependencies by design (see ISA.md § Constraints).
 //
-// Split into a pure, testable core (PomoDotKit: state machine + glyph table + theme)
-// and a thin AppKit/SwiftUI shell (PomoDot). The core is what `swift test` exercises;
-// executable targets can't be imported by test targets cleanly, hence the split.
+// The look and the menu-bar plumbing live in GlassKit, a sibling package. What's left here
+// is only what's actually about pomodoros: the state machine, the focus log, and the panel
+// that composes GlassKit's parts into this app's layout.
 let package = Package(
     name: "PomoDot",
     platforms: [.macOS(.v26)],
+    dependencies: [
+        .package(path: "../GlassKit"),
+    ],
     targets: [
         .target(
             name: "PomoDotKit",
+            dependencies: [.product(name: "GlassKit", package: "GlassKit")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .executableTarget(
