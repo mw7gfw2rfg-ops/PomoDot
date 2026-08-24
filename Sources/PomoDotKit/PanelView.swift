@@ -42,14 +42,6 @@ public struct PanelView: View {
     /// dot-matrix acts as a local scrim behind the numerals (see ISA § Decisions).
     /// When the user has asked the system for less transparency, we hand that back and
     /// use `.regular`, which does adapt (ISC-41).
-    /// A/B'd `.clear` against `.regular` over identical saturated backdrops: on macOS 27
-    /// they render near-identically here, so `.clear` costs nothing and is the literal
-    /// reading of "purely transparent". `.regular` is kept for Reduce Transparency, where
-    /// its adaptive dimming is the point.
-    private var glass: Glass {
-        reduceTransparency ? .regular : .clear
-    }
-
     public var body: some View {
         VStack(spacing: 0) {
             header
@@ -63,7 +55,7 @@ public struct PanelView: View {
         .padding(.top, 16)
         .padding(.bottom, 14)
         .frame(width: Layout.panelWidth)
-        .glassEffect(glass, in: .rect(cornerRadius: Theme.panelCornerRadius))
+        .glassSurface()
         .animation(reduceMotion ? nil : Theme.springDefault, value: engine.phase)
         .animation(reduceMotion ? nil : Theme.springDefault, value: engine.state)
     }
