@@ -108,6 +108,22 @@ public final class TimerEngine {
     /// Fired when a phase reaches zero, with the phase that just ended.
     public var onPhaseCompleted: ((Phase) -> Void)?
 
+    /// Fired whenever a focus phase ends by any route — completed, skipped or reset — with
+    /// the seconds *actually* focused and the instant the focus began.
+    ///
+    /// Actual elapsed, not the nominal phase length: logging 25 minutes for a session
+    /// abandoned at 3 would make the heatmap flatter you, and a log that flatters you is one
+    /// you stop trusting. Paused time is already excluded because `remaining` doesn't move
+    /// while paused.
+    public var onFocusEnded: ((_ seconds: Int, _ start: Date) -> Void)?
+
+    /// Wall-clock instant the current focus phase began, for attributing it to a calendar
+    /// day. Separate from `deadline`, which is monotonic and has no calendar meaning.
+    private var focusStartedAt: Date?
+
+    /// Fired for each transport action so the app can play a cue.
+    public var onCue: ((Cue) -> Void)?
+
     public init(durations: Durations = .standard,
                 now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         self.durations = durations
@@ -153,8 +169,12 @@ public final class TimerEngine {
     public func start() {
         guard state != .running else { return }
         deadline = now().advanced(by: .seconds(remainingWhenIdle))
+        // Stamp the calendar instant only on the *first* start of a focus phase, so
+        // pause/resume doesn't re-attribute the session to a later day.
+        if phase == .focus, focusStartedAt == nil { focusStartedAt = Date() }
         state = .running
         publish()
+        onCue?(.start)
     }
 
     public func pause() {
@@ -163,6 +183,7 @@ public final class TimerEngine {
         deadline = nil
         state = .paused
         publish()
+        onCue?(.pause)
     }
 
     public func toggle() {
@@ -171,17 +192,38 @@ public final class TimerEngine {
 
     /// Returns the current phase to its full length without changing which phase we're in.
     public func reset() {
+        // Restarting a focus phase still banks whatever was focused before the restart.
+        reportFocusEnded()
         state = .idle
         deadline = nil
         remainingWhenIdle = durations.length(of: phase)
         publish()
+        onCue?(.reset)
     }
 
     /// Abandons the current phase and moves to the next one, stopped.
     /// A skipped focus phase does NOT count as completed — you don't earn a pip for
-    /// work you didn't do.
+    /// work you didn't do. It *does* still log the minutes actually focused; pips count
+    /// finished pomodoros, the log counts time, and they answer different questions.
     public func skip() {
         advance(countingCompletion: false)
+        onCue?(.skip)
+    }
+
+    /// Banks any in-progress focus time at shutdown, so quitting mid-session doesn't discard
+    /// the minutes already worked. Idempotent — the start stamp is cleared on report.
+    public func flushFocusForShutdown() {
+        reportFocusEnded()
+    }
+
+    /// Emits the focus time accrued so far, if we're in a focus phase that has started.
+    /// Clears the stamp so the same stretch can never be reported twice.
+    private func reportFocusEnded() {
+        guard phase == .focus, let startedAt = focusStartedAt else { return }
+        let elapsed = durations.focus - remaining
+        focusStartedAt = nil
+        guard elapsed > 0 else { return }
+        onFocusEnded?(elapsed, startedAt)
     }
 
     /// Drives the clock. Call at ~1 Hz. Safe to call at any frequency, or not at all:
@@ -193,12 +235,15 @@ public final class TimerEngine {
         guard remaining == 0 else { return }
         let finished = phase
         advance(countingCompletion: true)
+        onCue?(finished == .focus ? .focusEnded : .breakEnded)
         onPhaseCompleted?(finished)
     }
 
     // MARK: - Phase advance
 
     private func advance(countingCompletion: Bool) {
+        // Must run before `remaining` is reset by the phase change.
+        reportFocusEnded()
         if phase == .focus && countingCompletion {
             completedFocusRuns += 1
             totalFocusRuns += 1

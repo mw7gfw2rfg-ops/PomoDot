@@ -76,6 +76,22 @@ public enum Theme {
     public static let springPanel = Animation.spring(response: 0.32, dampingFraction: 0.86)
 }
 
+/// Expands a small label's clickable area without changing how it looks.
+///
+/// A bare `Text` inside a `.plain` Button is hit-testable only across the glyph bounds, which
+/// for an 8pt three-letter legend is a target a few points tall — findable by a careful mouse
+/// and by nothing else. apple-design § 10 asks for ~10px of hit padding around small targets;
+/// `contentShape` is what actually makes the padded area clickable rather than merely spaced.
+public struct HitTarget: ViewModifier {
+    public init() {}
+    public func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+    }
+}
+
 /// A reusable micro-caps legend, so the tracking rule can't drift between call sites.
 public struct Legend: View {
     private let text: String

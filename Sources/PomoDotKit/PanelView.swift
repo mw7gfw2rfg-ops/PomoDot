@@ -9,7 +9,13 @@ import SwiftUI
 /// No child sets a fill.
 public struct PanelView: View {
     @Bindable private var engine: TimerEngine
+    @Bindable private var log: FocusLog
+    private let sound: SoundEngine
     private let onQuit: () -> Void
+
+    /// Mirrors `sound.isMuted` so the chip re-renders on toggle — `SoundEngine` owns audio
+    /// resources and isn't an observable model.
+    @State private var isMuted: Bool
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,9 +23,15 @@ public struct PanelView: View {
     /// The focus presets offered as TE-style numeric chips.
     private let presets = [15, 25, 50]
 
-    public init(engine: TimerEngine, onQuit: @escaping () -> Void) {
+    public init(engine: TimerEngine,
+                log: FocusLog,
+                sound: SoundEngine,
+                onQuit: @escaping () -> Void) {
         self.engine = engine
+        self.log = log
+        self.sound = sound
         self.onQuit = onQuit
+        self._isMuted = State(initialValue: sound.isMuted)
     }
 
     private var accent: Color { Theme.accent(for: engine.phase) }
@@ -44,6 +56,7 @@ public struct PanelView: View {
             pips
             transport
             footer
+            record
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
@@ -157,11 +170,50 @@ public struct PanelView: View {
 
             Spacer()
 
+            // Mute. A struck-through note glyph would need an icon font; the legend reading
+            // SND / MUTE says the state in words, which is the monospace-only rule anyway.
+            Button {
+                sound.isMuted.toggle()
+                isMuted = sound.isMuted
+                // Confirm un-muting audibly — the one case where the cue *is* the feedback.
+                if !isMuted { sound.play(.skip) }
+            } label: {
+                Legend(isMuted ? "MUTE" : "SND", size: 8, opacity: isMuted ? 0.7 : 0.34)
+                    .modifier(HitTarget())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(isMuted ? "Sound muted, tap to unmute" : "Sound on, tap to mute"))
+
             Button(action: onQuit) {
                 Legend("QUIT", size: 8, opacity: 0.34)
+                    .modifier(HitTarget())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text("Quit PomoDot"))
+        }
+        .padding(.top, 14)
+    }
+
+    // MARK: - Record
+    //
+    // Separated from the timer above by a hairline: the top of the panel is *now*, this is
+    // *history*. They're different kinds of information and shouldn't read as one block.
+
+    private var record: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Rectangle()
+                .fill(.primary.opacity(0.12))
+                .frame(height: 1)
+
+            StatsRow(todaySeconds: log.seconds(on: Date()),
+                     weekSeconds: log.secondsInLast(days: 7),
+                     totalSeconds: log.totalSeconds)
+
+            // The accent is used here even during a break, when it's otherwise suppressed.
+            // Deliberate: the restraint rule says colour marks *focus*, and this whole
+            // section is a record of focus. Suppressing it on breaks would make your history
+            // flicker for a reason that has nothing to do with your history.
+            HeatmapView(dailySeconds: log.dailyTotals(), accent: Theme.focusAccent)
         }
         .padding(.top, 14)
     }

@@ -3,7 +3,7 @@ task: Build PomoDot — a transparent Liquid Glass menu bar Pomodoro timer
 project: PomoDot
 effort: E3
 phase: verify
-progress: 40/41
+progress: 72/73
 mode: algorithm
 started: 2026-08-24
 updated: 2026-08-24
@@ -97,6 +97,44 @@ Ship a runnable, code-signed-optional `PomoDot.app` bundle that installs a templ
 - [x] ISC-37: A unit test asserts remaining time is derived from the deadline and is unaffected by tick frequency.
 - [x] ISC-38: `swift test` exits 0.
 
+**Sound (v1.1)**
+- [x] ISC-42: A tone is synthesised at runtime — no `.aiff`/`.wav`/`.mp3`/`.caf` asset is bundled or referenced.
+- [x] ISC-43: Distinct cues exist for start, pause, skip, reset, focus-end and break-end (6 distinct events).
+- [x] ISC-44: Every generated buffer begins and ends at zero amplitude (envelope applied), so no cue clicks.
+- [x] ISC-45: A unit test asserts the first and last samples of a generated cue are silent.
+- [x] ISC-46: A mute control exists in the panel and its state persists across a relaunch.
+- [x] ISC-47: Anti: when muted, no audio node is started and no cue plays.
+- [x] ISC-48: Audio failure (no device, engine start error) never crashes or blocks the timer.
+
+**Focus log (v1.1)**
+- [x] ISC-49: Completed focus time is appended to a durable file outside the app bundle.
+- [x] ISC-50: The store is append-only JSONL — one self-contained JSON object per line.
+- [x] ISC-51: The log survives an app relaunch (write, quit, relaunch, read back).
+- [x] ISC-52: Abandoning a focus phase (skip/reset) logs the time actually focused, not the full phase length.
+- [x] ISC-53: Anti: paused time is never counted as focused time.
+- [x] ISC-54: Anti: break phases are never written to the focus log.
+- [x] ISC-55: Sessions shorter than a 60s floor are not logged, so stray taps don't create noise.
+- [x] ISC-56: Daily totals bucket by the user's *local* calendar day, not by UTC.
+- [x] ISC-57: A corrupt or partial line in the log is skipped, not fatal.
+- [x] ISC-58: A unit test covers write → read → aggregate round-trip against a temp directory.
+- [x] ISC-59: Anti: tests and screenshots never write to the real `~/Library/Application Support/PomoDot` log.
+
+**Heatmap + stats (v1.1)**
+- [x] ISC-60: The panel shows a total of time focused today.
+- [x] ISC-61: The panel shows a rolling 7-day total and an all-time total.
+- [x] ISC-62: Durations render as monospaced `Nh Nm`, consistent with the type rule.
+- [x] ISC-63: A heatmap renders as a grid of 7 day-rows by N week-columns, GitHub-style.
+- [x] ISC-64: Each column is one calendar week and rows are ordered by weekday.
+- [x] ISC-65: The rightmost column is the current week — the grid ends at today.
+- [x] ISC-66: Cell intensity has 5 discrete levels driven by minutes focused that day.
+- [x] ISC-67: A `LESS … MORE` legend shows the scale, in micro-caps monospace.
+- [x] ISC-68: The window length is stated in the UI so "a set length of time" is explicit.
+- [x] ISC-69: Anti: the heatmap adds no second glass surface — ISC-18 still holds at exactly one.
+- [x] ISC-70: Anti: heatmap cells are squares, not circles, so they never compete with the dot-matrix.
+- [x] ISC-71: An empty log renders a deliberate empty grid, not a blank space or a crash.
+- [x] ISC-72: A unit test asserts grid geometry — 7 rows, correct weekday alignment, today in the last column.
+- [x] ISC-73: The panel still fits on screen below the status item after the new sections are added.
+
 **Fluid interface (apple-design)**
 - [x] ISC-39: Control press feedback is bound to the pressed state (pointer-down), not to the action closure.
 - [x] ISC-40: Phase transitions animate with a spring, and the panel entrance animates blur/scale together.
@@ -144,6 +182,24 @@ Ship a runnable, code-signed-optional `PomoDot.app` bundle that installs a templ
 - **2026-08-24** — Accent colour removed from *all* text. Measured over saturated backdrops: orange labels over a warm backdrop are unreadable through clear glass. Every label is now `.primary`; the accent is confined to the status LED, swept ticks, progress arc, pips and button strokes — marks that only need to be noticed, not read. Matches apple-design § 12 ("put colour on a layer, not on the translucent foreground") and is more faithful to TE, which colours hardware and never legends.
 - **2026-08-24** — Advisor findings triaged rather than adopted wholesale. Accepted: monotonic clock, `.common` run-loop mode + `beginActivity` (App Nap would freeze the visible countdown while the deadline stayed correct), `.stationary` collection behaviour, vertical clamp to `visibleFrame`. Rejected with reason: (a) the "colour-only state signal" accessibility concern — the LED always sits beside a text phase legend (FOCUS/BREAK/LONG BREAK) and a text run-state (RUN/HOLD/READY), so colour is never the sole channel; (b) "switch to `Glass.regular`" — A/B'd on identical saturated backdrops and found no legibility difference on macOS 27, so it would trade the literal requirement for nothing; (c) the advisor's `--auto-state` had loaded an unrelated agenticOS ISA, so its "state mismatch" opening was about the wrong document — this project's ISA is this file.
 
+- **2026-08-24 (v1.1)** — "Focused time" defined as **actual elapsed, paused time excluded, floored at 60s, attributed to the local calendar day the session began.** The alternative — log only completed pomodoros — renders 24 honest minutes interrupted at the door as a blank day, and blank days for real work is what makes people abandon a tracker. The opposite error, logging the full phase length for an abandoned session, makes the heatmap flatter you, and a log that flatters you is one you stop trusting. Completed pomodoros still drive the session pips; the log measures minutes. Two metrics, two questions, deliberately separate.
+- **2026-08-24 (v1.1)** — Cues are synthesised at runtime rather than bundled as audio files, for the same reason the dot-matrix is drawn rather than shipped as a font: the project's premise is that its assets are generated. Six cues, rising for beginnings and falling for stops, with the two phase-end figures ~2× the gain of the transport blips because they're the only ones you might be across the room from.
+- **2026-08-24 (v1.1)** — The heatmap uses the focus accent even during a break, when the accent is otherwise suppressed. Deliberate exception to the restraint rule: that rule says colour marks *focus*, and the whole section is a record of focus. Suppressing it on breaks would make your history flicker for a reason that has nothing to do with your history.
+- **2026-08-24 (v1.1)** — Intensity levels use fixed thresholds anchored to pomodoro counts (≈1/2/4/6) rather than quartiles of the user's own data. Quartiles are self-relative, so a light week would light up as brightly as a heavy one and the colour would stop meaning anything.
+- **2026-08-24 (v1.1)** — Fixed a multi-display bug found during verification: the panel opened on the secondary monitor while the status item sat on the main one. `NSStatusItem.button.window.screen` returned the wrong screen, and because placement *clamps* to that screen's `visibleFrame`, a wrong answer doesn't nudge the panel — it teleports it. Now derived from the status item's own frame, which can't disagree with where the item is.
+- **2026-08-24 (v1.1)** — `SND`/`QUIT` were bare `Text` in `.plain` buttons, so their hit area was the glyph bounds: a target a few points tall. Added a `HitTarget` modifier (padding + `contentShape`). Found because synthetic clicks on `SND` silently did nothing while clicks on the larger transport buttons worked.
+- **2026-08-24 (v1.1)** — Advisor findings triaged. Accepted as blocking: `O_APPEND` (two instances is not hypothetical — it's what happens when a new build launches before the old one quits, and the previous `write(to:atomically:)` fallback could have replaced the entire history); trailing-newline repair; storing the local day per record (unrecoverable from the epoch once the timezone rule changes). Accepted as cheap: flush-on-quit, sandbox note. **Rejected:** the claim that the 60s floor inflates a 3-second drain to a full minute — the floor *drops* sub-60s sessions rather than rounding up; direction misread. **Already handled:** per-line tolerant parsing, non-fatal writes, and the lid-closed-for-hours case, which cannot produce an absurd entry because elapsed is `phaseLength − remaining` and is therefore clamped to the phase length by construction.
+
+**Conjectured (v1.1)** — that `start()` then `skip()` in a unit test would exercise the abandoned-session path and log a partial duration.
+**Refuted by** — the test failing with `logged.count == 0`, and a crash on `logged[0]` immediately after. With no clock advance, elapsed is genuinely zero, so *correctly* nothing was logged; the test asserted behaviour the code was right to refuse.
+**Learned** — a callback-based log needs a controllable clock as much as the timer itself does. Asserting "some time was logged" without advancing time tests nothing, and a failing `#expect` does not halt the test, so the next line indexes an empty array and takes the whole suite down with a signal 5.
+**Criterion now** — every log-integration test injects `TestClock`, and ISC-52 is asserted as an exact duration (`600`) rather than an inequality.
+
+**Conjectured (v1.1)** — that pinning the envelope to zero at both ends of each note was enough to guarantee click-free cues.
+**Refuted by** — `everyCueStartsAndEndsSilent` failing on the *last* sample of every cue: `progress` was computed as `frame / frameCount`, which reaches only `(n-1)/n`, leaving the final sample mid-decay at non-zero amplitude — a step discontinuity, i.e. exactly the click the envelope exists to remove.
+**Learned** — an envelope is only as good as its parameterisation. "Zero at progress 1" is worthless if progress never reaches 1; off-by-one in a normalised ramp is silent in code review and audible in the product.
+**Criterion now** — ISC-44 is asserted at the sample level in both a unit test and an on-device probe, denominator `frameCount - 1`.
+
 ## Verification
 
 - ISC-1: `swift build -c release` — "Build complete! (20.12 secs)" on a cleaned package, exit 0.
@@ -176,6 +232,42 @@ Ship a runnable, code-signed-optional `PomoDot.app` bundle that installs a templ
 - ISC-39: `TransportButtonStyle` scales on `configuration.isPressed`, not in the action closure.
 - ISC-40: `MaterialisingPanel` animates `scaleEffect` + `blur` + `opacity` together under `Theme.springPanel`.
 - ISC-41: **[DEFERRED-VERIFY]** — `accessibilityReduceMotion` / `accessibilityReduceTransparency` are read and branched on in `PanelView` and `MaterialisingPanel`, and light/dark appearance switching was probed live, but the two accessibility toggles themselves were **not** exercised. Follow-up **POMODOT-1**: enable Reduce Motion and Reduce Transparency in System Settings and capture the panel under each. Deliberately not marked `[x]` — this is a code-path claim, not a live probe.
+
+### v1.1 — sound, focus log, heatmap
+
+- ISC-42: `find` for `.aiff`/`.wav`/`.mp3`/`.caf` outside `.build` → 0. Every tone is synthesised.
+- ISC-43/44/45: `soundprobe.swift` against the real audio device — all six cues render (`start` 4409 frames/100.0ms, `pause` 3087/70.0ms, `skip` 1234/28.0ms, `reset` 4410/100.0ms, `focusEnded` 15435/350.0ms, `breakEnded` 13671/310.0ms), every one with `first=0.00e+00 last=0.00e+00`. Transport cues peak ≈0.11, phase-end cues ≈0.21 — the intended loudness split. Tests `everyCueGeneratesSamples`, `everyCueStartsAndEndsSilent`, `cuesNeverClip`, `cuesAreDistinguishableFromEachOther`.
+- ISC-46: seeded `soundMuted=true` in `com.archierichardson.pomodot`, relaunched → chip renders `MUTE` at raised opacity (`shots/muted3-z.png`). Write path confirmed by the app's own plist containing `soundMuted`, `focus=1500`, `shortBreak=300`, `longBreak=900` after a clean quit.
+- ISC-47: `play(_:)` returns before `ensureEngineRunning()` when muted, so no node is started.
+- ISC-48: `engine.start()` is wrapped in do/catch returning nil; probe reported `engine.start(): OK isRunning=true` on this hardware, output device 48000 Hz.
+- ISC-49/50/52: **live end-to-end** — started a real session at 18:09:01 BST, skipped at 18:10:45, log contained exactly `{"seconds":106,"start":"2026-08-24T17:08:59Z"}`. 106s is elapsed, not the 25-minute phase length.
+- ISC-51: `logSurvivesAReopen`.
+- ISC-53: `pausedTimeIsNotCountedAsFocusedTime` — 10 min focused, 1 hr paused, logs 600.
+- ISC-54: `breakPhasesNeverReachTheFocusLog`.
+- ISC-55: `shortSessionsAreNotLogged` — 59s dropped, 60s kept.
+- ISC-56: `dailyTotalsBucketByLocalCalendarDay` plus `theStoredLocalDayIsUsedInsteadOfRederivingIt`; each record stores its own `yyyy-MM-dd`.
+- ISC-57: `corruptLineIsSkippedNotFatal` — a truncated final line costs one session, not the file.
+- ISC-58: `storeIsAppendOnlyJSONLWithOneObjectPerLine`, `rollingWindowCountsWholeLocalDaysIncludingToday`.
+- ISC-59: every test uses a fresh `tempDirectory()`; screenshots ran under `POMODOT_LOG_DIR`. Confirmed `~/Library/Application Support/PomoDot` stayed absent throughout ("real log untouched").
+- ISC-60/61/62: `shots/v2-stats.png` after the live session — `TODAY 1m / 7 DAYS 1m / TOTAL 1m`, monospaced. `durationsFormatTersely` covers `0m`, `25m`, `4h 25m`.
+- ISC-63/64/65/72: `gridIsSevenRowsByTheConfiguredNumberOfWeeks`, `eachColumnIsOneCalendarWeekInWeekdayOrder`, `todayFallsInTheLastColumn`, `gridIsContiguousAcrossWeekBoundaries`. Visually, the single logged session lit exactly the top-right cell.
+- ISC-66: `intensityLevelsAreAnchoredToPomodoroCounts` — fixed thresholds, capped at level 4.
+- ISC-67/68: `LESS ▪▪▪▪▪ MORE` and `LAST 26 WEEKS` visible in `shots/v2-final.png`.
+- ISC-69: `rg -c 'glassEffect\(' PanelView.swift` → 1. Still exactly one glass surface after adding two sections.
+- ISC-70: `rg 'Rectangle\(\)|Circle\(\)' Heatmap.swift` → two `Rectangle()`, no `Circle()`.
+- ISC-71: `shots/v2-empty.png` — full grid at level 0 with the legend showing the scale; `emptyLogProducesAFullGridOfLevelZero`.
+- ISC-73: panel measures 292×471 at y=36 on a 2005pt-tall screen.
+
+**Durability matrix** (post-advisor, all in `FocusLogTests`):
+
+| risk | probe |
+|---|---|
+| two instances clobbering the file | `concurrentWritersDoNotClobberEachOther` — 40 interleaved writes, none lost |
+| truncated line fusing with the next record | `appendRepairsAMissingTrailingNewline` |
+| history re-bucketed by a DST/timezone change | `theStoredLocalDayIsUsedInsteadOfRederivingIt` |
+| logs written before the `day` field existed | `entriesWrittenBeforeTheDayFieldExistedStillAggregate` |
+| double-count / lost time across transport orderings | `transportSequencesFlushEachSecondExactlyOnce` — 10 sequences |
+| lid closed for hours mid-focus | `sleepingThroughAPhaseCannotLogMoreThanThePhaseLength` — capped at 25m |
 
 **Legibility matrix** — the transparency-versus-contrast risk, probed over `backdrop` colour bands:
 

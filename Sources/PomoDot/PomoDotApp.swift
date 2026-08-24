@@ -22,6 +22,8 @@ enum PomoDotMain {
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let engine = TimerEngine()
+    private let log = FocusLog()
+    private let sound = SoundEngine()
     private var statusItem: NSStatusItem!
     private var panel: GlassPanel?
     private var ticker: Timer?
@@ -37,6 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         engine.onPhaseCompleted = { [weak self] finished in
             self?.handlePhaseCompleted(finished)
+        }
+        engine.onCue = { [weak self] cue in
+            self?.sound.play(cue)
+        }
+        engine.onFocusEnded = { [weak self] seconds, start in
+            self?.log.record(seconds: seconds, start: start)
         }
 
         // 1 Hz is enough: `remaining` is derived from a deadline, so this timer only
@@ -62,6 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Bank any focus accrued but not yet ended. Quitting 20 minutes into a session and
+        // losing all 20 is the kind of silent loss that makes a tracker untrustworthy.
+        // Safe against double-logging because `reportFocusEnded` clears the start stamp, and
+        // there is deliberately no launch-time recovery path to race with this.
+        engine.flushFocusForShutdown()
         persistSettings()
         ticker?.invalidate()
         removeClickMonitor()
@@ -105,7 +118,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Deliberately not UNUserNotificationCenter: that requires a signed, notarised
         // bundle and fails silently otherwise. A sound plus a pulsing menu bar item plus
         // opening the panel always works, on any build (ISA § Decisions).
-        NSSound(named: finished == .focus ? "Glass" : "Submarine")?.play()
+        //
+        // The cue itself is played by `engine.onCue`, which fires for every transport event;
+        // this handler owns only the visual half.
         pulseFramesRemaining = 8
         showPanel()
     }
@@ -118,10 +133,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let button = statusItem.button, let buttonWindow = button.window else { return }
         let frameOnScreen = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-        panel.position(below: frameOnScreen, on: buttonWindow.screen)
+        panel.position(below: frameOnScreen, on: Self.screen(containing: frameOnScreen))
 
         panel.orderFrontRegardless()
         installClickMonitor()
+    }
+
+    /// The screen the status item is actually on.
+    ///
+    /// Deliberately not `button.window.screen`: on a multi-display setup that returns the
+    /// wrong screen (observed returning the secondary display while the status item sat at
+    /// x≈2508 on the main one), and because `position(below:on:)` clamps to the given
+    /// screen's `visibleFrame`, a wrong answer doesn't nudge the panel — it teleports it to
+    /// another monitor. Deriving the screen from the item's own frame can't disagree with
+    /// where the item is.
+    private static func screen(containing frame: NSRect) -> NSScreen? {
+        let anchor = NSPoint(x: frame.midX, y: frame.midY)
+        return NSScreen.screens.first { $0.frame.contains(anchor) }
+            ?? NSScreen.screens.first { $0.frame.intersects(frame) }
+            ?? NSScreen.main
     }
 
     private func hidePanel() {
@@ -130,7 +160,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makePanel() -> GlassPanel {
-        let root = PanelView(engine: engine, onQuit: { NSApp.terminate(nil) })
+        let root = PanelView(engine: engine,
+                             log: log,
+                             sound: sound,
+                             onQuit: { NSApp.terminate(nil) })
         let hosting = NSHostingView(rootView: MaterialisingPanel { root })
         // .intrinsicContentSize is what makes the hosting view report a real
         // intrinsicContentSize; .preferredContentSize alone only drives the window and
