@@ -11,7 +11,10 @@ let package = Package(
     name: "PomoDot",
     platforms: [.macOS(.v26)],
     dependencies: [
-        .package(path: "../GlassKit"),
+        // URL rather than a local path so a standalone clone of this repo actually
+        // builds. For local GlassKit work, `swift package edit GlassKit --path ../GlassKit`
+        // swaps in a sibling checkout without touching this file.
+        .package(url: "https://github.com/mw7gfw2rfg-ops/GlassKit.git", from: "1.0.0"),
     ],
     targets: [
         .target(
